@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- Bar chart style -->
+    <link href="http://www.jqueryscript.net/css/jquerysctipttop.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="lib/css/" />
+</head>
+
+<body>
+    <!-- Bar chart canvas -->
+    <h2>Bar Chart</h2>
+    <div style="position: relative;">
+        <canvas id="BarChart" width="800" height="600" style="margin-top: 20px;"></canvas>
+    </div>
+    <br />
+    <hr />
+    <br />
+
+    <!-- User input for URL -->
+    <label for="urlInput">Enter API URL:</label>
+    <input type="text" id="urlInput" placeholder="https://your.api.url">
+
+    <!-- User input for object name -->
+    <label for="objectInput">Enter Object Name:</label>
+    <input type="text" id="objectInput" placeholder="Object Name">
+
+    <button onclick="getData()">Show Number of Entries</button>
+
+    <!-- Testing JSON data grid -->
+    <h2>JSON Data</h2>
+    <div id='jsonDataGrid'></div>
+
+    <!-- Script libraries -->
+    <!-- jQuery -->
+    <script src="lib/js/jquery-3.7.1.min.js"></script>
+    <!-- Chart.js (latest version) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        var myChart; // Variable to store the Chart instance
+        var urlAddress; // Variable to store the URL
+
+        // Fetch data based on user input
+        function getData() {
+            urlAddress = $('#urlInput').val();
+
+            // Check if the URL is not empty
+            if (urlAddress.trim() === "") {
+                alert("Please enter a valid URL.");
+                return;
+            }
+
+            // Fetch JSON data
+            $.ajax({
+                url: urlAddress,
+                context: document.body
+            }).done(function (data) {
+                console.log(data);
+                $("#jsonDataGrid").text(JSON.stringify(data));
+
+                // Call the function to create/update the chart with the fetched data
+                updateChart(data);
+            }).fail(function () {
+                alert("Something went wrong with getting data! Please check the URL.");
+            });
+        }
+
+        // Function to update the chart with new data
+        function updateChart(data) {
+            // Destroy the existing chart if it exists
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            const objectName = $('#objectInput').val();
+
+            // Extract relevant information for the chart
+            const dataCounts = countEntitiesByObjectName(data, objectName);
+
+            // Extract labels and data for the chart
+            const labels = Object.keys(dataCounts);
+            const dataValues = Object.values(dataCounts);
+
+            // Create or update the bar chart
+            const ctx = document.getElementById('BarChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `Number of Entries for ${objectName}`,
+                        data: dataValues,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1,
+                    }],
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                        },
+                    },
+                },
+            });
+        }
+
+        
+               // Function to count entiries based on the object name
+               function countEntitiesByObjectName(data, objectName) {
+                 const result = [];
+
+                // function for nested objects (go through the json)
+                 function recurse(current, path) {
+                    for (const key in current) {
+                     const value = current[key];
+                     const newPath = path ? `${path}.${key}` : key;
+                     if (value && typeof value === 'object') {
+                        recurse(value, newPath);
+                   } else {
+                       // Only push the path if it matches the specified objectName
+                        if (key === objectName) {
+                         result.push(newPath);
+                }
+            }
+        }
+    }
+
+         recurse(data, '');
+
+                      // how many time a map shows
+                        const counts = result.reduce((acc, path) => {
+                        const value = getValueByPath(data, path); // Get the value by path
+                         acc[value] = (acc[value] || 0) + 1;
+                                  return acc;
+    }, {});
+
+         return counts;
+}
+
+            // get the value of the object
+                    function getValueByPath(obj, path) {
+                       return path.split('.').reduce((acc, key) => acc[key], obj);
+}
+
+    </script>
+</body>
+
+</html>
