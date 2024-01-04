@@ -8,6 +8,8 @@
 </head>
 
 <body>
+    <!-- Image -->
+    <img src="C:\Users\asus\Desktop\OpenHubData Project\V2\barChartProject/download.jpg" alt="" style="display: block; margin: auto;">
     <!-- Bar chart canvas -->
     <h2>Bar Chart</h2>
     <div style="position: relative;">
@@ -20,16 +22,19 @@
     <!-- User input for URL -->
     <label for="urlInput">Enter API URL:</label>
     <input type="text" id="urlInput" placeholder="https://your.api.url">
-
+    <br />
+    <br />
     <!-- User input for object name -->
     <label for="objectInput">Enter Object Name:</label>
     <input type="text" id="objectInput" placeholder="Object Name">
-
+    <br />
+    <br />
+    <!-- User input for the number of data entries to display -->
+    <label for="numEntriesInput">Number of Data Entries to Display:</label>
+    <input type="number" id="numEntriesInput" value="10" min="1">
+    <br />
+    <br />
     <button onclick="getData()">Show Number of Entries</button>
-
-    <!-- Testing JSON data grid -->
-    <h2>JSON Data</h2>
-    <div id='jsonDataGrid'></div>
 
     <!-- Script libraries -->
     <!-- jQuery -->
@@ -51,6 +56,14 @@
                 return;
             }
 
+            const objectName = $('#objectInput').val();
+            const numEntries = $('#numEntriesInput').val();
+
+            // Define the filter condition
+            const filterCondition = (value, key) => key === objectName;
+
+            const chartTitle = objectName; // Set the chart title as the object name
+
             // Fetch JSON data
             $.ajax({
                 url: urlAddress,
@@ -59,39 +72,47 @@
                 console.log(data);
                 $("#jsonDataGrid").text(JSON.stringify(data));
 
-                // Call the function to create/update the chart with the fetched data
-                updateChart(data);
+                // Call the function to create/update the chart with the fetched and customized data
+                updateChart(data, filterCondition, chartTitle, numEntries);
             }).fail(function () {
                 alert("Something went wrong with getting data! Please check the URL.");
             });
         }
 
-        // Function to update the chart with new data
-        function updateChart(data) {
+        // Function to update the chart with new data and customization options
+        function updateChart(data, filterCondition, chartTitle = 'Number of Entries', numEntries = 10) {
             // Destroy the existing chart if it exists
             if (myChart) {
                 myChart.destroy();
             }
 
-            const objectName = $('#objectInput').val();
-
             // Extract relevant information for the chart
-            const dataCounts = countEntitiesByObjectName(data, objectName);
+            const dataCounts = countAndFilterEntities(data, filterCondition, numEntries);
 
             // Extract labels and data for the chart
-            const labels = Object.keys(dataCounts);
-            const dataValues = Object.values(dataCounts);
+            let labels = Object.keys(dataCounts);
+            let dataValues = Object.values(dataCounts);
 
-            // Create or update the bar chart
+            // Combine labels and dataValues into pairs for sorting
+            const pairs = labels.map((label, index) => ({ label, value: dataValues[index] }));
+
+            // Sort pairs in descending order based on values
+            pairs.sort((a, b) => b.value - a.value);
+
+            // Update labels and dataValues with sorted values
+            labels = pairs.map(pair => pair.label);
+            dataValues = pairs.map(pair => pair.value);
+
+            // Create or update the bar chart with custom title
             const ctx = document.getElementById('BarChart').getContext('2d');
             myChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: `Number of Entries for ${objectName}`,
+                        label: `${chartTitle}`,
                         data: dataValues,
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        backgroundColor: getRandomColors(dataValues.length), // Set your desired colors here
                         borderColor: 'rgba(75, 192, 192, 1)',
                         borderWidth: 1,
                     }],
@@ -106,45 +127,59 @@
             });
         }
 
-        
-               // Function to count entiries based on the object name
-               function countEntitiesByObjectName(data, objectName) {
-                 const result = [];
+        // Function to count entries based on the object name and filter the data
+        function countAndFilterEntities(data, filterCondition, numEntries) {
+            const result = [];
 
-                // function for nested objects (go through the json)
-                 function recurse(current, path) {
-                    for (const key in current) {
-                     const value = current[key];
-                     const newPath = path ? `${path}.${key}` : key;
-                     if (value && typeof value === 'object') {
+            // Function for nested objects (go through the JSON)
+            function recurse(current, path) {
+                for (const key in current) {
+                    const value = current[key];
+                    const newPath = path ? `${path}.${key}` : key;
+                    if (value && typeof value === 'object') {
                         recurse(value, newPath);
-                   } else {
-                       // Only push the path if it matches the specified objectName
-                        if (key === objectName) {
-                         result.push(newPath);
+                    } else {
+                        // Only push the path if it matches the filter condition
+                        if (filterCondition(value, key)) {
+                            result.push(newPath);
+                        }
+                    }
                 }
             }
+
+            recurse(data, '');
+
+            // Count how many times a map shows
+            const counts = result.reduce((acc, path) => {
+                const value = getValueByPath(data, path); // Get the value by path
+                acc[value] = (acc[value] || 0) + 1;
+                return acc;
+            }, {});
+
+            // Take only the specified number of entries
+            const slicedCounts = Object.entries(counts).slice(0, numEntries);
+
+            return Object.fromEntries(slicedCounts);
         }
-    }
 
-         recurse(data, '');
+        // Function to get the value of the object
+        function getValueByPath(obj, path) {
+            return path.split('.').reduce((acc, key) => acc[key], obj);
+        }
 
-                      // how many time a map shows
-                        const counts = result.reduce((acc, path) => {
-                        const value = getValueByPath(data, path); // Get the value by path
-                         acc[value] = (acc[value] || 0) + 1;
-                                  return acc;
-    }, {});
-
-         return counts;
-}
-
-            // get the value of the object
-                    function getValueByPath(obj, path) {
-                       return path.split('.').reduce((acc, key) => acc[key], obj);
-}
-
+        // Function to generate an array of random colors
+        function getRandomColors(numColors) {
+            const colors = [];
+            for (let i = 0; i < numColors; i++) {
+                const randomColor = `rgba(${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, 0.7)`;
+                colors.push(randomColor);
+            }
+            return colors;
+        }
     </script>
+
+ 
 </body>
 
 </html>
+
